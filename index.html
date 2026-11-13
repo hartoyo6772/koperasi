@@ -1,1 +1,97 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner Kartu Koperasi</title>
+<!--
+  Halaman scanner QR untuk aplikasi Koperasi Asrama.
+  Taruh file ini di GitHub Pages, lalu isi SCANNER_URL di Code.gs dengan alamatnya.
+  Aplikasi membuka halaman ini di jendela baru. Setelah QR terbaca, kodenya dikirim
+  kembali ke aplikasi (window.opener.postMessage) dan jendela ini menutup sendiri.
+-->
+<style>
+  :root{--g8:#0E4D3F;--g6:#1F7A5C;--gold:#F5D37A}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{display:flex;flex-direction:column;background:#0A3B30;color:#fff;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{padding:14px 18px;font-weight:700;font-size:18px}
+  header small{display:block;font-weight:400;font-size:14px;color:#bfe0d1}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 14px 18px}
+  #reader{width:100%;max-width:440px;border-radius:12px;overflow:hidden;background:#000;min-height:260px}
+  #status{min-height:24px;text-align:center;color:#bfe0d1}
+  #status.err{color:#ffb4a9}
+  #hasil{display:none;width:100%;max-width:440px;background:#fff;color:#17231F;border-radius:12px;padding:16px;text-align:center}
+  #hasil b{display:block;font-size:20px;word-break:break-all;margin:6px 0 12px}
+  button{font:inherit;font-weight:600;padding:11px 18px;border-radius:9px;border:1px solid var(--g8);background:var(--g8);color:#fff;cursor:pointer;min-height:44px}
+  button.alt{background:#fff;color:var(--g8)}
+  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>Pindai kartu santri<small>Arahkan kamera ke QR pada kartu</small></header>
+<main>
+  <div id="reader"></div>
+  <div id="status" role="status" aria-live="polite">Membuka kamera…</div>
+  <div id="hasil">
+    <div>Kode terbaca:</div><b id="kode"></b>
+    <div class="row"><button id="salin">Salin kode</button><button id="ulang" class="alt">Pindai lagi</button></div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function(){
+  var statusEl=document.getElementById('status'), terkirim=false, scanner=null;
+  function info(t,err){statusEl.textContent=t;statusEl.className=err?'err':'';}
 
+  function selesai(kode){
+    if(terkirim)return;
+    terkirim=true;
+    if(navigator.vibrate)navigator.vibrate(120);
+    stop();
+    if(window.opener&&!window.opener.closed){
+      // aplikasi memeriksa asal pesan; isi pesan hanya kode yang terbaca
+      window.opener.postMessage({type:'koperasi-scan',code:kode},'*');
+      info('Terkirim ke aplikasi. Jendela ini akan menutup…');
+      setTimeout(function(){window.close();},400);
+    }else{
+      // dibuka langsung (bukan dari aplikasi): tampilkan kodenya
+      document.getElementById('reader').style.display='none';
+      statusEl.textContent='';
+      document.getElementById('kode').textContent=kode;
+      document.getElementById('hasil').style.display='block';
+    }
+  }
+
+  function stop(){
+    if(!scanner)return;
+    var s=scanner; scanner=null;
+    s.stop().then(function(){s.clear();}).catch(function(){});
+  }
+
+  function mulai(){
+    terkirim=false;
+    document.getElementById('hasil').style.display='none';
+    document.getElementById('reader').style.display='block';
+    if(typeof Html5Qrcode==='undefined'){info('Pustaka pemindai gagal dimuat. Periksa koneksi internet lalu muat ulang.',true);return;}
+    scanner=new Html5Qrcode('reader');
+    scanner.start(
+      {facingMode:'environment'},
+      {fps:10,qrbox:function(w,h){var s=Math.floor(Math.min(w,h)*0.7);return{width:s,height:s};}},
+      function(text){selesai(String(text).trim());},
+      function(){}
+    ).then(function(){info('Arahkan kamera ke QR pada kartu santri.');})
+     .catch(function(){info('Kamera tidak bisa dibuka. Izinkan akses kamera pada browser, lalu muat ulang halaman ini.',true);});
+  }
+
+  document.getElementById('ulang').onclick=mulai;
+  document.getElementById('salin').onclick=function(){
+    var t=document.getElementById('kode').textContent;
+    if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){info('Kode disalin.');});
+  };
+  window.addEventListener('pagehide',stop);
+  mulai();
+})();
+</script>
+</body>
+</html>
